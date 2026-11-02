@@ -40,6 +40,8 @@ rule all:
     input:
         expand("../results/FET_pvals/all/p_bins_{pair}.tsv", pair=UNLINKED_PAIRS),
         expand("../results/FET_pvals/all/sites_{pair}.tsv", pair=UNLINKED_PAIRS),
+        "../results/FET_pvals/sum_p_bins.tsv",
+        "../results/FET_pvals/sig_sites.tsv",
 
 
 # Create some input data
@@ -261,7 +263,7 @@ rule make_ahmm_inputs:
             --rec {input.rec} \
             -g 1 \
             -m 1000 \
-            --min-diff 0 \
+            --min-diff 0.1 \
             > {output.table}
         """
 
@@ -274,12 +276,12 @@ rule split_ahmm_inputs:
         table="../results/AHMM_inputs/full/FR_ZI_DGRP_{chrom}.tsv",
         samples="../results/VCF_to_AHMM.samples"
     output:
-        tables=expand("../results/AHMM_inputs/split/{sample}_{{chrom}}.tsv",
+        tables=expand("../results/AHMM_inputs/split/{{chrom}}_{sample}.tsv",
                       sample=SAMPLES),
-        samples=expand("../results/AHMM_inputs/split/{sample}_{{chrom}}.samples",
+        samples=expand("../results/AHMM_inputs/split/{{chrom}}_{sample}.samples",
                        sample=SAMPLES)
     params:
-        prefix="../results/AHMM_inputs/split/"
+        prefix="../results/AHMM_inputs/split/{chrom}_"
     shell:
         """
         python {input.script} \
@@ -305,10 +307,10 @@ rule run_ancestry_hmm:
     # Execute Ancestry HMM in unique directories to manage output files with
     # degenerate sample names.
     input:
-        table="../results/AHMM_inputs/split/{sample}_{chrom}.tsv",
-        samples="../results/AHMM_inputs/split/{sample}_{chrom}.samples"
+        table="../results/AHMM_inputs/split/{chrom}_{sample}.tsv",
+        samples="../results/AHMM_inputs/split/{chrom}_{sample}.samples"
     output:
-        temp("../results/AHMM_outputs/split/{sample}_{chrom}.posterior")
+        "../results/AHMM_outputs/split/{sample}_{chrom}.posterior"
     params:
         out="{sample}.posterior",
         temp_dir="{sample}_{chrom}"
@@ -316,8 +318,8 @@ rule run_ancestry_hmm:
         """
         mkdir {params.temp_dir}
         cd {params.temp_dir}
-        ancestry_hmm -i {input.table} \
-            -s {input.samples} \
+        ancestry_hmm -i ../{input.table} \
+            -s ../{input.samples} \
             -a 2 0.8 0.2 \
             -p 0 0.8 1598 \
             -p 1 0.2 1598 \
@@ -382,7 +384,28 @@ rule compute_fet_pvals:
         python {input.script} \
             -i1 {input.block1} \
             -i2 {input.block2} \
-            --threshold 1e-6 \
+            --threshold 1e-5 \
             -b {output.bins_table} \
             -s {output.site_table}
+        """
+
+rule sum_p_values:
+    input:
+        tables=expand("../results/FET_pvals/all/p_bins_{pair}.tsv", pair=UNLINKED_PAIRS)
+    output:
+        table="../results/FET_pvals/sum_p_bins.tsv"
+    run:
+        sums = 0
+        for filename in input.tables:
+            sums += np.loadtxt(filename)[:, 1]
+        np.savetxt(output.table, sums)
+
+rule cat_sig_sites:
+    input:
+        expand("../results/FET_pvals/all/sites_{pair}.tsv", pair=UNLINKED_PAIRS)
+    output:
+        "../results/FET_pvals/sig_sites.tsv"
+    shell:
+        """
+        cat {input} > {output}
         """

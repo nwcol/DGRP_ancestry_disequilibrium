@@ -57,12 +57,11 @@ if __name__ == "__main__":
             n01 = np.sum((anc1 == 0) & (ancs2 == 1), axis=1)
             n10 = np.sum((anc1 == 1) & (ancs2 == 0), axis=1)
             n11 = np.sum((anc1 == 1) & (ancs2 == 1), axis=1)
-            # Check whether all elements of the contingency table are filled
-            nXX = n00 + n01 + n10 + n11
+            # Check whether to run FET on each contingency table
             n1X = n10 + n11
             nX1 = n01 + n11
             # Keep ``True`` entries, drop ``False`` entries
-            keep = (n1X > 1) & (nX1 > 1) & (n1X < nXX - 1) & (nX1 < nXX - 1)
+            keep = (n1X > 1) & (nX1 > 1) & (n00 > 0) & (n11 > 0)
             p_fets = []
             for ii in range(len(ancs2)):
                 if not keep[ii]:
@@ -73,7 +72,7 @@ if __name__ == "__main__":
                 p_fets.append(p_fet)
                 if p_fet <= args.threshold:
                     info = [site1[0], site1[1], sites2[ii][0], sites2[ii][1],
-                            p_fets[ii], n00[ii], n01[ii], n10[ii], n11[ii]]
+                            p_fet, n00[ii], n01[ii], n10[ii], n11[ii]]
                     line_out = "\t".join([str(x) for x in info]) + "\n"
                     fout.write(line_out)
             binned_p += np.histogram(p_fets, bins=p_bins)[0]

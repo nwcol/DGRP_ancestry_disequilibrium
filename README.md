@@ -1,4 +1,4 @@
-### Mosaic ancestry in the Drosophila Genetic Reference Panel (DGRP-3)
+## Mosaic ancestry in the Drosophila Genetic Reference Panel (DGRP-3)
 
 This repository contains a Snakemake pipeline and Python scripts to infer
 ancestry tracts in the admixed *Drosophila melanogaster* Genetic Reference
@@ -10,7 +10,7 @@ epistasis' and putative incompatabilities between the parent populations of
 DGRP-3.
 
 
-## Requirements
+### Requirements
 
 To obtain the required Python packages, create a virtual environment and
 install them using pip:
@@ -25,7 +25,7 @@ Install Ancestry HMM by following the directions found here:
 [https://github.com/russcd/Ancestry\_HMM/tree/master](https://github.com/russcd/Ancestry_HMM/tree/master).
 
 
-## Running the pipeline
+### Running the pipeline
 
 To run the pipeline, first download the DGRP-3 VCF file from 
 [https://quantgenet.msu.edu/dgrp3/downloads.html](https://quantgenet.msu.edu/dgrp3/downloads.html)

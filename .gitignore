@@ -2,9 +2,11 @@ workflow/.snakemake/
 .ipynb_checkpoints/
 data/vcfs/
 results/vcfs/
-results/AHMM_inputs/*.tsv
-results/AHMM_inputs/split/*.tsv
-results/AHMM_inputs/split/*.samples
-results/AHMM_outputs/*.posterior
-results/ancestry/*.tsv
-
+results/AHMM_inputs/full/
+results/AHMM_inputs/split/
+results/AHMM_outputs/full/
+results/AHMM_outputs/split/
+results/ancestry/full/
+results/ancestry/blocks/
+results/FET_pvals/all/
+old_results/
