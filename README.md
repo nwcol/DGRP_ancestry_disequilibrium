@@ -5,7 +5,7 @@ ancestry tracts in the admixed *Drosophila melanogaster* Genetic Reference
 Panel version 3 (DGRP-3) (Lyman et al, 
 [2026 https://doi.org/10.64898/2026.05.29.728783](https://doi.org/10.64898/2026.05.29.728783)).
 By inferring ancestry across the genome and computing metrics of association
-between ancestry at pairs of loci, we can learn about the extent of `ancestry
+between ancestry at pairs of loci, we can learn about the extent of 'ancestry
 epistasis' and putative incompatabilities between the parent populations of
 DGRP-3.
 
@@ -36,6 +36,14 @@ same directory.
 With these files in hand, you can run the [Snakefile](workflow/Snakefile).
 This will simplify/merge the DRGP-3 and panel VCF files, process genotypes into
 the input format required by Ancestry HMM, run ancestry HMM, then analyze
-inferred ancestry associations.
+inferred ancestry associations. Specifically, we compute Fisher exact test
+(FET) p-values for the following contingency table of two-locus ancestry calls,
+where A represents inferred African ancestry (proxied by ZI) and E represents
+inferred European ancestry (FR):
+
+|              | A at locus 2 | E at locus 2 |
+|:-------------|:------------:|:------------:|
+| A at locus 1 | #AA | #AE |
+| E at locus 1 | #EA | #EE |
 
 

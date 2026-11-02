@@ -2,7 +2,6 @@
 Modify a tab-separated recombination map by:
 - Extending the map (with rate 0.01 cM/Mb, or r=1e-10) to chromosome start/end
 - Renaming 'Arm' column to 'Chrom'
-- Relabeling chromosomes using a tab-separated mapping file (--labels)
 - Renaming 'c (cM/Mb)' column to 'cM/Mb'.
 """
 
@@ -17,7 +16,6 @@ C_MISS = 0.01
 def get_args():
     parser = argparse.ArgumentParser()
     parser.add_argument("-i", "--input", required=True)
-    parser.add_argument("-l", "--labels", required=True)
     parser.add_argument("-g", "--genome", required=True,
                         help="Genome file with tab-separated chrom label, length")
     parser.add_argument("-o", "--output", required=True)
@@ -28,11 +26,11 @@ if __name__ == "__main__":
     args = get_args()
     col_names = ["Chrom", "Start", "Stop", "cM/Mb"]
     df = pandas.read_csv(args.input, sep="\\s+", names=col_names, skiprows=1)
-    chr_map_df = pandas.read_csv(
-        args.labels, sep="\\s+", names=["label", "code"])
-    chr_map = {int(chr_map_df.loc[i, "code"]): chr_map_df.loc[i, "label"]
-               for i in range(len(chr_map_df))}
-    df.Chrom = [chr_map[x] for x in df["Chrom"]]
+    #chr_map_df = pandas.read_csv(
+    #    args.labels, sep="\\s+", names=["label", "code"])
+    #chr_map = {int(chr_map_df.loc[i, "code"]): chr_map_df.loc[i, "label"]
+    #           for i in range(len(chr_map_df))}
+    #df.Chrom = [chr_map[x] for x in df["Chrom"]]
     # Extend the map to chromosome start/end positions
     genome = pandas.read_csv(
         args.genome, sep="\\s+", names=["Chrom", "Length"], index_col="Chrom")
@@ -58,5 +56,3 @@ if __name__ == "__main__":
         extended_sub_dfs.append(pandas.concat(data))
     out_df = pandas.concat(extended_sub_dfs)
     out_df.to_csv(args.output, sep="\t", index=0)
-
-

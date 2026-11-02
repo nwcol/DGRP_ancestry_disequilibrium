@@ -272,4 +272,3 @@ if __name__ == "__main__":
             # Update position information
             last_position = int(line[1])
             last_map_coord = map_coord
-

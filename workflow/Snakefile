@@ -16,9 +16,20 @@ def get_chrom_code(wildcards):
 
 # Constants. It would be better for ``CHROMS`` to be called ``ARMS``.
 
+BLOCKS = 10
 CHROMS = ["2L", "2R", "3L", "3R", "X"]
+
+UNLINKED_ARMS = [("X", "2L"), ("X", "2R"), ("X", "3L"), ("X", "3R"),
+                 ("2L", "3L"), ("2L", "3R"),]
+UNLINKED_PAIRS = []
+for arm1, arm2 in UNLINKED_ARMS:
+    for i in range(BLOCKS):
+        for j in range(BLOCKS):
+            pair = f"{arm1}_{i:02d}_{arm2}_{j:02d}"
+            UNLINKED_PAIRS.append(pair)
+
 SAMPLES = []
-with open("../results/DGRP_samples.txt", "r") as fin:
+with open("../data/vcfs/DGRP_samples.txt", "r") as fin:
     for line in fin:
         SAMPLES.append(line.strip())
 
@@ -27,7 +38,8 @@ with open("../results/DGRP_samples.txt", "r") as fin:
 
 rule all:
     input:
-        "../results/ancestry/DGRP_ancestry_c.tsv",
+        expand("../results/FET_pvals/all/p_bins_{pair}.tsv", pair=UNLINKED_PAIRS),
+        expand("../results/FET_pvals/all/sites_{pair}.tsv", pair=UNLINKED_PAIRS),
 
 
 # Create some input data
@@ -49,8 +61,7 @@ rule rebuild_rec_map:
     # rename arms from numeric codes to strings, e.g. 7 -> 2R.
     input:
         script="scripts/rebuild_recomb.py",
-        rec_map="../data/recomb_r6_num.tsv",
-        labels="../data/chr_map.txt",
+        rec_map="../data/recomb_r6.txt",
         genome="../data/r6.genome"
     output:
         "../results/recomb_r6.tsv"
@@ -58,7 +69,6 @@ rule rebuild_rec_map:
         """
         python {input.script} \
             -i {input.rec_map} \
-            -l {input.labels} \
             -g {input.genome} \
             -o {output}
         """
@@ -66,16 +76,18 @@ rule rebuild_rec_map:
 
 # Extract sample labels from VCFs
 
-rule extract_dgrp_sample_names:
+# Deprecated. As this Snakefile reads this file, it is now independently
+# created (using the same command) at ../data/vcfs/DGRP_samples.txt.
+#rule extract_dgrp_sample_names:
     # Extract sample names from the DGRP VCF file.
-    input:
-        "../data/vcfs/DGRP-3_final_biallelic-new.vcf.gz"
-    output:
-        "../results/DGRP_samples.txt"
-    shell:
-        """
-        bcftools query -l {input} > {output}
-        """
+#    input:
+#        "../data/vcfs/DGRP-3_final_biallelic-new.vcf.gz"
+#    output:
+#        "../results/DGRP_samples.txt"
+#    shell:
+#        """
+#        bcftools query -l {input} > {output}
+#        """
 
 rule extract_panel_sample_names:
     # Extract sample names from the ZI, ET, FR panel and subset to ZI, FR
@@ -96,8 +108,8 @@ rule make_ahmm_to_vcf_sample_file:
     #   sample_ZI_1 1
     #   sample_DGRP admixed
     input:
-        dgrp="../results/DGRP_samples.txt",
-        panel="../results/ZI_FR_samples.txt"
+        dgrp="../data/vcfs/DGRP_samples.txt",
+        panel="../results/FR_ZI_samples.txt"
     output:
         "../results/VCF_to_AHMM.samples"
     shell:
@@ -107,16 +119,17 @@ rule make_ahmm_to_vcf_sample_file:
         awk '{{print $0 "\tadmixed"}}' {input.dgrp} >> {output}
         """
 
-rule make_ahmm_sample_file:
+# Deprecated - not needed.
+#rule make_ahmm_sample_file:
     # Add a column with ploidy (`2`) to the DGRP sample list.
-    input:
-        "../results/DGRP_samples.txt"
-    output:
-        "../results/DGRP_AHMM.samples"
-    shell:
-        """
-        awk '{{print $0 "\t2"}}' {input} > {output}
-        """
+#    input:
+#        "../../data/vcfs/DGRP_samples.txt"
+#    output:
+#        "../results/DGRP_AHMM.samples"
+#    shell:
+#        """
+#        awk '{{print $0 "\t2"}}' {input} > {output}
+#        """
 
 
 # Simplify VCFs and split them by chromosome
@@ -239,7 +252,7 @@ rule make_ahmm_inputs:
         samples="../results/VCF_to_AHMM.samples",
         rec="../results/recomb_r6.tsv"
     output:
-        table="../results/AHMM_inputs/FR_ZI_DGRP_{chrom}.tsv"
+        table="../results/AHMM_inputs/full/FR_ZI_DGRP_{chrom}.tsv"
     shell:
         """
         python {input.script} \
@@ -247,22 +260,9 @@ rule make_ahmm_inputs:
             --samples {input.samples} \
             --rec {input.rec} \
             -g 1 \
-            -m 1 \
+            -m 1000 \
             --min-diff 0 \
             > {output.table}
-        """
-
-rule concatenate_ahmm_inputs:
-    # Concatenate all chromosome-specific Ancestry HMM input tables into a
-    # single file.
-    input:
-        expand("../results/AHMM_inputs/FR_ZI_DGRP_{chrom}.tsv",
-               chrom=CHROMS)
-    output:
-        "../results/AHMM_inputs/FR_ZI_DGRP_all.tsv"
-    shell:
-        """
-        cat {input} > {output}
         """
 
 
@@ -271,12 +271,12 @@ rule split_ahmm_inputs:
     # (to reduce the speed of AHMM runs and allow parallelization).
     input:
         script="scripts/split_ahmm_input.py",
-        table="../results/AHMM_inputs/FR_ZI_DGRP_all.tsv",
+        table="../results/AHMM_inputs/full/FR_ZI_DGRP_{chrom}.tsv",
         samples="../results/VCF_to_AHMM.samples"
     output:
-        tables=expand("../results/AHMM_inputs/split/{sample}.tsv",
+        tables=expand("../results/AHMM_inputs/split/{sample}_{{chrom}}.tsv",
                       sample=SAMPLES),
-        samples=expand("../results/AHMM_inputs/split/{sample}.samples",
+        samples=expand("../results/AHMM_inputs/split/{sample}_{{chrom}}.samples",
                        sample=SAMPLES)
     params:
         prefix="../results/AHMM_inputs/split/"
@@ -302,16 +302,20 @@ rule run_ancestry_hmm:
     #       generations ago
     #   -ne 2500000 : Effective population size of the admixed population.
     #   -g : Use genotype information rather than read counts.
+    # Execute Ancestry HMM in unique directories to manage output files with
+    # degenerate sample names.
     input:
-        table="../results/AHMM_inputs/split/{sample}.tsv",
-        samples="../results/AHMM_inputs/split/{sample}.samples"
+        table="../results/AHMM_inputs/split/{sample}_{chrom}.tsv",
+        samples="../results/AHMM_inputs/split/{sample}_{chrom}.samples"
     output:
-        "../results/AHMM_outputs/{sample}.posterior"
+        temp("../results/AHMM_outputs/split/{sample}_{chrom}.posterior")
     params:
         out="{sample}.posterior",
-        dir="../results/AHMM_outputs/"
+        temp_dir="{sample}_{chrom}"
     shell:
-       """
+        """
+        mkdir {params.temp_dir}
+        cd {params.temp_dir}
         ancestry_hmm -i {input.table} \
             -s {input.samples} \
             -a 2 0.8 0.2 \
@@ -319,7 +323,9 @@ rule run_ancestry_hmm:
             -p 1 0.2 1598 \
             -ne 2500000 \
             -g
-        mv {params.out} {params.dir}
+        cd ..
+        mv {params.temp_dir}/{params.out} {output}
+        rm -r {params.temp_dir}
         """
 
 
@@ -330,11 +336,11 @@ rule buld_ancestry_table:
     # and merge samples into one large ancestry table.
     input:
         script="scripts/merge_ahmm_outputs.py",
-        tables=expand("../results/AHMM_outputs/{sample}.posterior",
+        tables=expand("../results/AHMM_outputs/split/{sample}_{{chrom}}.posterior",
                       sample=SAMPLES),
         samples="../results/VCF_to_AHMM.samples",
     output:
-        "../results/ancestry/DGRP_ancestry.tsv"
+        "../results/ancestry/full/DGRP_ancestry_{chrom}.tsv"
     shell:
         """
         python {input.script} \
@@ -343,43 +349,40 @@ rule buld_ancestry_table:
             -o {output}
         """
 
-rule add_ancestry_recomb_rate_column:
-    # Add a column with the recombination rate at each SNP to the ancestry
-    # table.
+rule split_chrom_ancestry_tables:
+    # Break ancestry tables into ``BLOCKS`` contiguous subsets to make Fisher
+    # Exact Test (FET) p-value calculation more parallelizable.
     input:
-        ancestry="../results/ancestry/DGRP_ancestry.tsv",
-        split_input=f"../results/AHMM_inputs/split/{SAMPLES[0]}.tsv"
+        "../results/ancestry/full/DGRP_ancestry_{chrom}.tsv"
     output:
-        table="../results/ancestry/DGRP_ancestry_c.tsv"
-    run:
-        df = pandas.read_csv(input.split_input, sep="\t", names=range(9))
-        c = df[6]  # recombination rate
-        df = pandas.read_csv(input.ancestry, sep="\t")
-        df["c"] = c
-        cols = list(df.columns)
-        cols.pop(-1)
-        cols.insert(2, "c")
-        df = df[cols]
-        df.to_csv(output.table, sep="\t", index=False)
+        [f"../results/ancestry/blocks/DGRP_ancestry_{{chrom}}_{x:02d}.tsv"
+         for x in range(BLOCKS)]
+    params:
+        prefix="../results/ancestry/blocks/DGRP_ancestry_{chrom}_",
+        chunks=BLOCKS
+    shell:
+        """
+        split -d --additional-suffix=.tsv {input} {params.prefix}
+        """
 
 
 # Compute Fisher Exact Tes (FET) p-values for pairwise site ancestry
 
 rule compute_fet_pvals:
+    # Compute FET p-values between unlinked chromosomes.
     input:
         script="scripts/compute_fet_pvals.py",
-        anc_table="../results/ancestry/DGRP_ancestry_c.tsv"
+        block1="../results/ancestry/blocks/DGRP_ancestry_{arm1}_{i}.tsv",
+        block2="../results/ancestry/blocks/DGRP_ancestry_{arm2}_{j}.tsv",
     output:
-        bins_table="../results/FET_pvals/{arm1}_{arm2}_FET_binned_pvals.tsv",
-        site_table="../results/FET_pvals/{arm1}_{arm2}_FET_site_pvals.tsv"
+        bins_table="../results/FET_pvals/all/p_bins_{arm1}_{i}_{arm2}_{j}.tsv",
+        site_table="../results/FET_pvals/all/sites_{arm1}_{i}_{arm2}_{j}.tsv",
     shell:
         """
         python {input.script} \
-            -i {input.anc_table} \
-            --arm1 {wildcards.arm1} \
-            --arm2 {wildcards.arm2} \
-            --threshold 1e-5 \
+            -i1 {input.block1} \
+            -i2 {input.block2} \
+            --threshold 1e-6 \
             -b {output.bins_table} \
             -s {output.site_table}
         """
-
